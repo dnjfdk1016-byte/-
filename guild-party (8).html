@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>길드 파티 관리</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;background:#eef2f7;min-height:100vh;padding:16px}
+h1{text-align:center;color:#5a7fa8;font-size:20px;margin-bottom:14px}
+:root{
+  --btn-bg:#ddeaf8;--btn-color:#3a6ab0;--btn-border:#bbd0ee;--btn-hover:#ccddf5;
+  --btn-danger-bg:#e4ddf5;--btn-danger-color:#5a3a9a;--btn-danger-border:#c8b8e8;
+}
+.main-tabs{display:flex;justify-content:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.main-tab{display:flex;align-items:center;gap:5px;padding:8px 18px;border:2px solid #ccd8e8;border-radius:22px;background:white;color:#7a9ab8;font-size:13px;font-weight:bold;cursor:pointer;transition:all .2s}
+.main-tab:hover:not(.active){background:#f0f6ff}
+.main-tab.active{background:linear-gradient(135deg,#5b8fd4,#3a6ab0);color:white;border-color:#3a6ab0;box-shadow:0 3px 10px rgba(58,106,176,.3)}
+.main-tab.share-tab{border-color:var(--btn-border);color:var(--btn-color)}
+.main-tab.share-tab:hover{background:var(--btn-hover)}
+.btn{padding:7px 16px;border:2px solid var(--btn-border);border-radius:20px;cursor:pointer;font-size:12px;font-weight:bold;transition:all .2s;background:var(--btn-bg);color:var(--btn-color)}
+.btn:hover{transform:translateY(-1px);background:var(--btn-hover)}
+.btn:active{transform:translateY(0)}
+.btn-cancel{background:#f0f2f5;color:#7a8a9a;border-color:#d0d8e4}
+.btn-cancel:hover{background:#e4e8ef}
+.btn-confirm{background:linear-gradient(135deg,#5b8fd4,#3a6ab0);color:white;border-color:#3a6ab0}
+.btn-confirm:hover{opacity:.9}
+.btn-del-real{background:#fde8e8;color:#c0392b;border-color:#f5c0c0}
+.btn-del-real:hover{background:#f8d0d0}
+.info{text-align:center;color:#999;font-size:12px;margin-bottom:12px}
+
+/* ===== 메인 레이아웃 ===== */
+.main-layout{display:flex;gap:14px;max-width:1400px;margin:0 auto;align-items:flex-start}
+
+/* 사이드바 */
+.left-sidebar{
+  width:124px;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  position:sticky;
+  top:16px;
+  max-height:calc(100vh - 90px);
+}
+.sidebar-label{font-size:11px;font-weight:bold;color:#7a9ab8;background:white;border-radius:10px;padding:6px 8px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);flex-shrink:0}
+.sidebar-count{font-size:10px;color:#aac;font-weight:normal;display:block;margin-top:2px}
+.sidebar-btns{display:grid;grid-template-columns:1fr 1fr;gap:5px;flex-shrink:0}
+.sidebar-btn{padding:7px 4px;border:2px solid var(--btn-border);border-radius:9px;cursor:pointer;font-size:11px;font-weight:bold;transition:all .15s;text-align:center;background:var(--btn-bg);color:var(--btn-color);line-height:1.3}
+.sidebar-btn:hover{background:var(--btn-hover);transform:translateY(-1px)}
+.sidebar-btn:active{transform:translateY(0)}
+.sidebar-btn.sb-wide{grid-column:1/-1}
+.sb-reset{background:var(--btn-danger-bg);color:var(--btn-danger-color);border-color:var(--btn-danger-border)}
+.sb-reset:hover{background:#d8d0f0}
+.drag-hint{font-size:10px;color:#aac;text-align:center;flex-shrink:0}
+
+/* 풀 카드 스크롤 */
+.pool-cards{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding-right:4px;
+  scrollbar-width:thin;
+  scrollbar-color:#bbd0ee transparent;
+}
+.pool-cards::-webkit-scrollbar{width:4px}
+.pool-cards::-webkit-scrollbar-track{background:transparent}
+.pool-cards::-webkit-scrollbar-thumb{background:#bbd0ee;border-radius:4px}
+
+/* 풀 카드: 케이스 온전하게 */
+.pool-card{
+  background:white;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,.1);
+  overflow:hidden;
+  border:2px solid transparent;
+  transition:border-color .15s,box-shadow .15s,opacity .15s;
+  cursor:grab;
+  user-select:none;
+  flex-shrink:0;   /* 압축 방지 핵심 */
+}
+.pool-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.15);border-color:#5b8fd4}
+.pool-card:active{cursor:grabbing}
+.pool-card.dragging{opacity:.4;transform:scale(.96)}
+.pool-card-portrait{
+  width:100%;
+  height:100px;     /* 명시적 높이 - 압축 안 됨 */
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:32px;
+  overflow:hidden;
+  pointer-events:none;
+}
+.pool-card-portrait img{width:100%;height:100%;object-fit:cover;display:block}
+.pool-card-info{padding:5px 7px 7px;pointer-events:none}
+.pool-card-name{font-size:11px;font-weight:bold;color:#2c3e50;word-break:break-all;line-height:1.3}
+.pool-card-role{font-size:10px;color:#7a9ab8;margin-top:2px}
+.pool-empty{color:#bbb;font-size:11px;text-align:center;padding:16px 4px;line-height:1.8}
+
+/* 파티 - 한 줄 4개 고정 */
+.parties-main{flex:1;min-width:0}
+.parties-grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);  /* 한 줄에 무조건 4개 */
+  gap:10px;
+}
+.party-card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden}
+.party-header{padding:8px 12px;background:white;border-bottom:2px solid #e8f0f8;display:flex;align-items:center;justify-content:space-between}
+.party-name{color:#5b8fd4;font-weight:bold;font-size:13px;cursor:pointer}
+.party-name:hover{text-decoration:underline}
+.party-count{background:#eef4fc;color:#5b8fd4;font-size:10px;font-weight:bold;border-radius:8px;padding:2px 7px}
+.party-body{padding:8px}
+.slots{display:flex;flex-direction:column;gap:5px}
+.slot{display:flex;align-items:center;gap:6px;border-radius:8px;padding:5px 7px;min-height:36px;transition:background .12s,border-color .12s,transform .1s}
+.slot.filled{background:linear-gradient(90deg,#f5f9ff,#eef4fc);border:1px solid #dce8f8}
+.slot.filled:hover{background:linear-gradient(90deg,#e8f2ff,#dceeff)}
+.slot.empty{background:none;border:2px dashed #ccd8e8;cursor:pointer}
+.slot.empty:hover{background:#f0f6ff;border-color:#5b8fd4}
+.slot.drag-over{background:#e8f4ff !important;border:2px dashed #5b8fd4 !important;transform:scale(1.02)}
+.slot-num{width:14px;font-size:9px;color:#aac;font-weight:bold;flex-shrink:0;text-align:center}
+.slot-port{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;overflow:hidden}
+.slot-port img{width:100%;height:100%;object-fit:cover}
+.slot-info{flex:1;min-width:0}
+.slot-name{font-size:11px;font-weight:bold;color:#2c3e50;word-break:break-all;line-height:1.2}
+.slot-role{font-size:10px;color:#7a9ab8;margin-top:1px}
+.slot-remove{background:none;border:none;color:#ccc;cursor:pointer;font-size:13px;flex-shrink:0;transition:color .12s;padding:0 2px}
+.slot-remove:hover{color:#9078c8}
+.slot-add-label{flex:1;font-size:10px;color:#aac;font-weight:bold;text-align:center}
+
+/* 멤버 탭 */
+.member-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;justify-content:center}
+.select-mode-bar{display:flex;align-items:center;gap:8px;background:white;border-radius:14px;padding:7px 14px;box-shadow:0 2px 8px rgba(0,0,0,.08);flex-wrap:wrap;justify-content:center}
+.select-count{font-size:12px;color:#5a3a9a;font-weight:bold}
+.member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;max-width:1000px;margin:0 auto}
+.card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;align-items:center;padding-bottom:8px;transition:transform .2s,box-shadow .2s;position:relative}
+.card:hover{transform:translateY(-2px);box-shadow:0 5px 14px rgba(0,0,0,.12)}
+.card.selected{outline:3px solid #9078c8;outline-offset:-2px;background:#f8f0ff}
+.card-checkbox{position:absolute;top:6px;left:6px;width:18px;height:18px;border-radius:5px;border:2px solid #c8b8e8;background:white;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:10;transition:all .15s}
+.card-checkbox.show{display:flex}
+.card-checkbox.checked{background:#9078c8;border-color:#9078c8;color:white;font-size:11px}
+.portrait-wrap{width:100%;aspect-ratio:1;background:linear-gradient(135deg,#d0e4f8,#bbd0f0);position:relative;cursor:pointer;overflow:hidden}
+.portrait-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.portrait-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#7a9ab8;font-size:11px;gap:3px}
+.portrait-placeholder .icon{font-size:26px}
+.portrait-overlay{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:white;font-size:10px;opacity:0;transition:opacity .2s;font-weight:bold}
+.portrait-wrap:hover .portrait-overlay{opacity:1}
+.card-name{margin-top:6px;font-size:11px;font-weight:bold;color:#2c3e50;text-align:center;padding:0 5px;word-break:break-all}
+.card-role{font-size:10px;color:#7a9ab8;margin-top:1px}
+.card-party-badge{font-size:9px;color:#5b8fd4;margin-top:1px}
+.card-actions{display:flex;gap:4px;margin-top:5px}
+.card-btn{border:2px solid var(--btn-border);border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:bold;transition:all .2s;background:var(--btn-bg);color:var(--btn-color)}
+.card-btn:hover{background:var(--btn-hover)}
+.btn-del{background:#fde8e8;color:#c0392b;border-color:#f5c0c0}
+.btn-del:hover{background:#f8d0d0}
+.table-wrap{overflow-x:auto;max-width:1200px;margin:0 auto}
+table.pt{width:100%;border-collapse:separate;border-spacing:0;background:white;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.08);overflow:hidden}
+table.pt th{background:linear-gradient(135deg,#5b8fd4,#3a6ab0);color:white;font-size:12px;font-weight:bold;padding:10px 12px;text-align:center;white-space:nowrap}
+table.pt td{padding:8px 12px;font-size:12px;text-align:center;border-bottom:1px solid #eef2f8;color:#2c3e50;vertical-align:middle}
+table.pt tr:last-child td{border-bottom:none}
+table.pt tr:hover td{background:#f5f9ff}
+.tm{display:inline-flex;align-items:center;gap:5px;font-weight:bold}
+.tp{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;overflow:hidden;flex-shrink:0}
+.tp img{width:100%;height:100%;object-fit:cover}
+.te{color:#ccc;font-size:11px}
+.sub-party-row td{color:#7a6ab0}.sub-party-row{background:#f4f0fc}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:white;border-radius:18px;padding:22px 18px;width:340px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.modal h2{font-size:16px;color:#3a6ab0;margin-bottom:12px;text-align:center}
+.modal input[type=text],.modal textarea{width:100%;border:2px solid #dde8f0;border-radius:10px;padding:8px 12px;font-size:13px;outline:none;transition:border-color .2s;margin-bottom:8px;font-family:inherit}
+.modal input[type=text]:focus,.modal textarea:focus{border-color:#5b8fd4}
+.modal textarea{height:100px;resize:vertical}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.hint{font-size:11px;color:#999;margin-bottom:7px}
+.pick-list{max-height:250px;overflow-y:auto;border:2px solid #eef4f8;border-radius:10px;margin-bottom:10px}
+.pick-item{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;transition:background .12s;border-bottom:1px solid #f0f4f8}
+.pick-item:last-child{border-bottom:none}.pick-item:hover{background:#eef6ff}
+.pick-port{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;overflow:hidden;flex-shrink:0}
+.pick-port img{width:100%;height:100%;object-fit:cover}
+.pick-info{flex:1}
+.pick-name{font-size:13px;font-weight:bold;color:#2c3e50}
+.pick-role{font-size:11px;color:#7a9ab8}
+.share-url-box{width:100%;border:2px solid var(--btn-border);border-radius:10px;padding:9px 12px;font-size:11px;color:#444;background:var(--btn-bg);word-break:break-all;max-height:65px;overflow-y:auto;margin-bottom:8px;line-height:1.5}
+.copy-ok{color:#3a6ab0;font-size:12px;text-align:center;margin-top:4px;min-height:18px}
+.share-note{font-size:11px;color:#777;margin-bottom:9px;line-height:1.6}
+</style>
+</head>
+<body>
+<h1>⚔️ 길드 파티 관리</h1>
+<div class="main-tabs">
+  <div class="main-tab" id="tab-member" onclick="switchMain('member')">👥 멤버</div>
+  <div class="main-tab active" id="tab-board" onclick="switchMain('board')">📊 보드</div>
+  <div class="main-tab" id="tab-table" onclick="switchMain('table')">📋 표</div>
+  <div class="main-tab share-tab" onclick="openShareModal()">🔗 공유 링크</div>
+</div>
+<div class="info" id="infoBar"></div>
+
+<div id="view-member" style="display:none">
+  <div class="member-toolbar" id="normalToolbar">
+    <button class="btn" onclick="openAddModal()">+ 추가</button>
+    <button class="btn" onclick="openPasteModal()">📝 복붙</button>
+    <button class="btn" onclick="enterSelectMode()">☑️ 선택 삭제</button>
+    <button class="btn btn-del-real" onclick="deleteAllMembers()">🗑️ 전체 삭제</button>
+  </div>
+  <div class="member-toolbar" id="selectToolbar" style="display:none">
+    <div class="select-mode-bar">
+      <span class="select-count" id="selectCount">0명 선택됨</span>
+      <button class="btn" onclick="toggleSelectAll()">전체 선택</button>
+      <button class="btn btn-del-real" onclick="deleteSelected()">🗑️ 선택 삭제</button>
+      <button class="btn btn-cancel" onclick="exitSelectMode()">취소</button>
+    </div>
+  </div>
+  <div class="member-grid" id="memberGrid"></div>
+</div>
+
+<div id="view-board">
+  <div class="main-layout">
+    <div class="left-sidebar">
+      <div class="sidebar-label">서브파티<span class="sidebar-count" id="poolCount"></span></div>
+      <div class="sidebar-btns">
+        <button class="sidebar-btn" onclick="openAddModal()">+ 추가</button>
+        <button class="sidebar-btn" onclick="openPasteModal()">📝 복붙</button>
+        <button class="sidebar-btn sb-wide sb-reset" onclick="resetAll()">🔄 파티 배정 초기화</button>
+      </div>
+      <div class="drag-hint">드래그하여 배정 ↓</div>
+      <div class="pool-cards" id="poolCards"></div>
+    </div>
+    <div class="parties-main">
+      <div class="parties-grid" id="partiesGrid"></div>
+    </div>
+  </div>
+</div>
+
+<div id="view-table" style="display:none">
+  <div class="table-wrap"><table class="pt" id="partyTable"></table></div>
+</div>
+
+<div class="modal-bg" id="editModal">
+  <div class="modal"><h2>메버 추가</h2>
+    <input type="text" id="inputName" placeholder="닉네임"/>
+    <input type="text" id="inputRole" placeholder="직업 / 역할 (선택)"/>
+    <div class="modal-btns"><button class="btn btn-cancel" onclick="closeModal('editModal')">취소</button><button class="btn btn-confirm" onclick="saveAdd()">저장</button></div>
+  </div>
+</div>
+<div class="modal-bg" id="pasteModal">
+  <div class="modal"><h2>닉네임 일괄 추가</h2>
+    <p class="hint">줄바꿈으로 구분해서 붙여넣으세요.</p>
+    <textarea id="pasteText" placeholder="닉네임1&#10;닉네임2"></textarea>
+    <div class="modal-btns"><button class="btn btn-cancel" onclick="closeModal('pasteModal')">취소</button><button class="btn btn-confirm" onclick="savePaste()">추가</button></div>
+  </div>
+</div>
+<div class="modal-bg" id="editMemberModal">
+  <div class="modal"><h2>메버 수정</h2>
+    <input type="text" id="inputEditName" placeholder="닉네임"/>
+    <input type="text" id="inputEditRole" placeholder="직업 / 역할 (선택)"/>
+    <div class="modal-btns"><button class="btn btn-cancel" onclick="closeModal('editMemberModal')">취소</button><button class="btn btn-confirm" onclick="saveEditMember()">저장</button></div>
+  </div>
+</div>
+<div class="modal-bg" id="pickModal">
+  <div class="modal"><h2 id="pickModalTitle">메버 선택</h2>
+    <div class="pick-list" id="pickList"></div>
+    <div class="modal-btns"><button class="btn btn-cancel" onclick="closeModal('pickModal')">취소</button></div>
+  </div>
+</div>
+<div class="modal-bg" id="shareModal">
+  <div class="modal">
+    <h2>🔗 공유 링크</h2>
+    <p class="share-note">편집 불가 · 누구나 열 수 있는 링크입니다.<br>초상화 이미지도 함께 포함됩니다.</p>
+    <div class="share-url-box" id="shareUrlBox"></div>
+    <div class="copy-ok" id="copyOk"></div>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeModal('shareModal')">닫기</button>
+      <button class="btn btn-confirm" onclick="copyLink()">📋 복사</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+
+<script>
+const SK='gm3_data',PC=8,SC=5;
+let members=[],parties=[],currentMain='board';
+let uploadId=null,editId=null,pickPartyId=null,pickSlot=null,shareUrl='';
+let selectMode=false,selectedIds=new Set();
+let dragMemberId=null;
+
+const ROLE_COLORS={'비비':'#e67e22','어스':'#3498db','파이터':'#e74c3c','마법사':'#9b59b6','힙사':'#27ae60','시프':'#1abc9c','스나이퍼':'#7f8c8d','아체':'#f39c12','파라딘':'#2980b9','사낔':'#c0392b','코어라더':'#16a085','벤워':'#8e44ad'};
+function getRoleColor(r){if(!r)return'#5b8fd4';for(const[k,v]of Object.entries(ROLE_COLORS))if(r.includes(k))return v;return'#5b8fd4';}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function load(){
+  const raw=localStorage.getItem(SK);
+  if(raw){const d=JSON.parse(raw);members=d.members||[];parties=d.parties||[];}
+  for(let i=parties.length;i<PC;i++) parties.push({id:uid(),name:`${i+1}파티`});
+  parties=parties.slice(0,PC);
+  members=members.map(m=>({id:m.id||uid(),name:m.name||'',role:m.role||'',portrait:m.portrait||null,partyId:m.partyId||null,slotIndex:m.slotIndex??null}));
+}
+function save(){localStorage.setItem(SK,JSON.stringify({members,parties}));}
+
+function switchMain(tab){
+  currentMain=tab;
+  if(tab!=='member') exitSelectMode();
+  ['member','board','table'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('view-'+t).style.display=t===tab?'':'none';
+  });
+  render();
+}
+function render(){
+  const sub=members.filter(m=>!m.partyId).length,t=members.length;
+  document.getElementById('infoBar').textContent=`전체 ${t}명 · 배정됨 ${t-sub}명 · 서브파티 ${sub}명`;
+  if(currentMain==='member') renderMembers();
+  else if(currentMain==='board') renderBoard();
+  else renderTable();
+}
+
+function enterSelectMode(){
+  selectMode=true;selectedIds.clear();
+  document.getElementById('normalToolbar').style.display='none';
+  document.getElementById('selectToolbar').style.display='';
+  renderMembers();
+}
+function exitSelectMode(){
+  selectMode=false;selectedIds.clear();
+  document.getElementById('normalToolbar').style.display='';
+  document.getElementById('selectToolbar').style.display='none';
+  if(currentMain==='member') renderMembers();
+}
+function updateSelectCount(){document.getElementById('selectCount').textContent=`${selectedIds.size}명 선택됨`;}
+function toggleSelectMember(mid){
+  if(selectedIds.has(mid)) selectedIds.delete(mid); else selectedIds.add(mid);
+  updateSelectCount();renderMembers();
+}
+function toggleSelectAll(){
+  if(selectedIds.size===members.length) selectedIds.clear();
+  else members.forEach(m=>selectedIds.add(m.id));
+  updateSelectCount();renderMembers();
+}
+function deleteSelected(){
+  if(selectedIds.size===0){alert('선택된 메버가 없어요!');return;}
+  if(!confirm(`선택한 ${selectedIds.size}명을 삭제할까요?`)) return;
+  members=members.filter(m=>!selectedIds.has(m.id));save();exitSelectMode();render();
+}
+function deleteAllMembers(){
+  if(members.length===0){alert('멤버가 없어요!');return;}
+  if(!confirm(`전체 멤버 ${members.length}명을 모두 삭제할까요?`)) return;
+  members=[];save();render();
+}
+
+function renderMembers(){
+  const grid=document.getElementById('memberGrid');grid.innerHTML='';
+  if(!members.length){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:#bbb;padding:30px;font-size:13px">멤버가 없어요.<br><span style="font-size:11px">+ 추가 버튼을 눈러주세요!</span></div>';
+    return;
+  }
+  members.forEach(m=>{
+    const party=parties.find(p=>p.id===m.partyId);
+    const isSelected=selectedIds.has(m.id);
+    const card=document.createElement('div');card.className='card'+(isSelected?' selected':'');
+    const cb=document.createElement('div');
+    cb.className='card-checkbox'+(selectMode?' show':'')+(isSelected?' checked':'');
+    cb.textContent=isSelected?'✓':'';
+    cb.onclick=(e)=>{e.stopPropagation();toggleSelectMember(m.id);};
+    card.appendChild(cb);
+    const pw=document.createElement('div');pw.className='portrait-wrap';
+    if(selectMode) pw.onclick=()=>toggleSelectMember(m.id);
+    else pw.onclick=()=>triggerUpload(m.id);
+    if(m.portrait) pw.innerHTML=`<img src="${m.portrait}"><div class="portrait-overlay">${selectMode?'✔':'📷'}</div>`;
+    else pw.innerHTML=`<div class="portrait-placeholder" style="background:${getRoleColor(m.role)}22"><span class="icon">🗡️</span></div><div class="portrait-overlay">${selectMode?'✔':'📷 추가'}</div>`;
+    const nm=document.createElement('div');nm.className='card-name';nm.textContent=m.name;
+    const role=document.createElement('div');role.className='card-role';role.textContent=m.role||'';
+    const badge=document.createElement('div');badge.className='card-party-badge';
+    badge.textContent=party?`파티: ${party.name}`:'서브파티';
+    card.append(pw,nm,role,badge);
+    if(!selectMode){
+      const actions=document.createElement('div');actions.className='card-actions';
+      actions.innerHTML=`<button class="card-btn" onclick="openEditMember('${m.id}')">✏️ 수정</button><button class="card-btn btn-del" onclick="delMember('${m.id}')">🗑️ 삭제</button>`;
+      card.appendChild(actions);
+    } else {
+      card.onclick=()=>toggleSelectMember(m.id);
+      card.style.cursor='pointer';
+    }
+    grid.appendChild(card);
+  });
+}
+
+function renderBoard(){
+  const pool=members.filter(m=>!m.partyId);
+  document.getElementById('poolCount').textContent=`${pool.length}명`;
+  const pc=document.getElementById('poolCards');pc.innerHTML='';
+  if(!pool.length){
+    pc.innerHTML='<div class="pool-empty">🎉<br>모두<br>배정됨!</div>';
+  } else {
+    pool.forEach(m=>{
+      const card=document.createElement('div');card.className='pool-card';
+      card.draggable=true;
+      card.addEventListener('dragstart',e=>{
+        dragMemberId=m.id;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed='move';
+        e.dataTransfer.setData('text/plain',m.id);
+      });
+      card.addEventListener('dragend',()=>{dragMemberId=null;card.classList.remove('dragging');});
+      const rc=getRoleColor(m.role);
+      const portDiv=document.createElement('div');portDiv.className='pool-card-portrait';
+      portDiv.style.background=m.portrait?'#000':`linear-gradient(135deg,${rc}44,${rc}22)`;
+      portDiv.innerHTML=m.portrait?`<img src="${m.portrait}">`:`<span>👤</span>`;
+      const infoDiv=document.createElement('div');infoDiv.className='pool-card-info';
+      const colorBar=document.createElement('div');colorBar.style.cssText=`height:3px;background:${rc};margin-bottom:4px;border-radius:0`;
+      const nameEl=document.createElement('div');nameEl.className='pool-card-name';nameEl.textContent=m.name;
+      const roleEl=document.createElement('div');roleEl.className='pool-card-role';roleEl.textContent=m.role||'역할 미지정';
+      infoDiv.append(colorBar,nameEl,roleEl);
+      card.append(portDiv,infoDiv);
+      pc.appendChild(card);
+    });
+  }
+
+  const pg=document.getElementById('partiesGrid');pg.innerHTML='';
+  parties.forEach(p=>{
+    const slots=getSlots(p.id);const filled=slots.filter(s=>s).length;
+    const partyCard=document.createElement('div');partyCard.className='party-card';
+    partyCard.innerHTML=`<div class="party-header"><div class="party-name" onclick="renameParty('${p.id}')">${esc(p.name)}</div><div class="party-count">${filled}/${SC}</div></div><div class="party-body"><div class="slots" id="sl-${p.id}"></div></div>`;
+    pg.appendChild(partyCard);
+    const sEl=document.getElementById(`sl-${p.id}`);
+    slots.forEach((m,si)=>{
+      const slot=document.createElement('div');
+      if(m){
+        slot.className='slot filled';const rc=getRoleColor(m.role);
+        const port=document.createElement('div');port.className='slot-port';
+        port.style.background=m.portrait?'#000':`linear-gradient(135deg,${rc}55,${rc}33)`;
+        if(m.portrait) port.innerHTML=`<img src="${m.portrait}">`; else port.innerHTML='<span>👤</span>';
+        const info=document.createElement('div');info.className='slot-info';
+        const nm=document.createElement('div');nm.className='slot-name';nm.textContent=m.name;
+        const rl=document.createElement('div');rl.className='slot-role';rl.style.color=rc;rl.textContent=m.role||'';
+        info.append(nm,rl);
+        const rb=document.createElement('button');rb.className='slot-remove';rb.textContent='✕';
+        rb.onclick=()=>{m.partyId=null;m.slotIndex=null;save();render();};
+        slot.innerHTML=`<div class="slot-num" style="color:${rc}">${si+1}</div>`;
+        slot.append(port,info,rb);
+      } else {
+        slot.className='slot empty';
+        slot.innerHTML=`<div class="slot-num">${si+1}</div><div class="slot-add-label">빈 자리</div>`;
+        slot.onclick=()=>openPickModal(p.id,si);
+        slot.addEventListener('dragover',e=>{
+          if(!dragMemberId) return;
+          e.preventDefault();e.dataTransfer.dropEffect='move';
+          slot.classList.add('drag-over');
+        });
+        slot.addEventListener('dragleave',()=>slot.classList.remove('drag-over'));
+        slot.addEventListener('drop',e=>{
+          e.preventDefault();slot.classList.remove('drag-over');
+          const mid=e.dataTransfer.getData('text/plain')||dragMemberId;
+          if(!mid) return;
+          const mem=members.find(x=>x.id===mid);
+          if(!mem||mem.partyId===p.id) return;
+          mem.partyId=p.id;mem.slotIndex=si;
+          save();render();
+        });
+      }
+      sEl.appendChild(slot);
+    });
+  });
+}
+
+function renderTable(){
+  const tbl=document.getElementById('partyTable');tbl.innerHTML='';
+  let h='<thead><tr><th>파티</th>';
+  for(let i=1;i<=SC;i++) h+=`<th>${i}번</th>`;
+  h+='</tr></thead>';tbl.innerHTML=h;
+  const tb=document.createElement('tbody');tbl.appendChild(tb);
+  parties.forEach(p=>{
+    const slots=getSlots(p.id);
+    const tr=document.createElement('tr');tr.innerHTML=`<td><strong>${esc(p.name)}</strong></td>`;
+    slots.forEach(m=>{
+      const td=document.createElement('td');
+      if(m){
+        const rc=getRoleColor(m.role);
+        td.innerHTML=`<div class="tm"><div class="tp" style="background:${rc}33">${m.portrait?`<img src="${m.portrait}">`:`👤`}</div><div><div style="font-size:11px;font-weight:bold;color:#2c3e50">${esc(m.name)}</div><div style="font-size:9px;color:${rc}">${esc(m.role||'')}</div></div></div>`;
+      } else td.innerHTML='<span class="te">-</span>';
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  const sub=members.filter(m=>!m.partyId);
+  if(sub.length){
+    const tr=document.createElement('tr');tr.className='sub-party-row';
+    tr.innerHTML='<td><strong>서브파티</strong></td>';
+    const td=document.createElement('td');td.colSpan=SC;
+    td.innerHTML=sub.map(m=>`<span style="margin-right:8px;font-size:11px">👤 ${esc(m.name)}${m.role?` (${esc(m.role)})`:''}</span>`).join('');
+    tr.appendChild(td);tb.appendChild(tr);
+  }
+}
+
+function getSlots(partyId){
+  const slots=Array(SC).fill(null);
+  members.filter(m=>m.partyId===partyId).forEach(m=>{ if(m.slotIndex!=null&&m.slotIndex<SC) slots[m.slotIndex]=m; });
+  members.filter(m=>m.partyId===partyId&&(m.slotIndex==null||m.slotIndex>=SC)).forEach(m=>{
+    const e=slots.findIndex(s=>s===null);if(e!==-1){slots[e]=m;m.slotIndex=e;}
+  });
+  return slots;
+}
+
+function openShareModal(){
+  const full=members.map(m=>({id:m.id,name:m.name,role:m.role||'',partyId:m.partyId,slotIndex:m.slotIndex,portrait:m.portrait||null}));
+  const enc=btoa(unescape(encodeURIComponent(JSON.stringify({members:full,parties}))));
+  shareUrl='data:text/html;charset=utf-8,'+encodeURIComponent(buildViewHtml(enc));
+  document.getElementById('shareUrlBox').textContent=shareUrl.slice(0,200)+'...';
+  document.getElementById('copyOk').textContent='';
+  document.getElementById('shareModal').classList.add('show');
+}
+function copyLink(){
+  navigator.clipboard.writeText(shareUrl).then(()=>{
+    document.getElementById('copyOk').textContent='✅ 클립보드에 복사되었어요!';
+  }).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=shareUrl;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    document.getElementById('copyOk').textContent='✅ 클립보드에 복사되었어요!';
+  });
+}
+
+function buildViewHtml(enc){
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>\uae38\ub4dc \ud30c\ud2f0 \ud604\ud669</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans KR',sans-serif;background:#eef2f7;min-height:100vh;padding:16px}h1{text-align:center;color:#5a7fa8;font-size:20px;margin-bottom:4px}.sub{text-align:center;color:#aac;font-size:11px;margin-bottom:12px}.tabs{display:flex;justify-content:center;gap:8px;margin-bottom:12px}.tab{display:flex;align-items:center;gap:5px;padding:7px 16px;border:2px solid #bbd0ee;border-radius:20px;background:#ddeaf8;color:#3a6ab0;font-size:12px;font-weight:bold;cursor:pointer;transition:all .2s}.tab:hover:not(.active){background:#ccddf5}.tab.active{background:linear-gradient(135deg,#5b8fd4,#3a6ab0);color:white;border-color:#3a6ab0}.info{text-align:center;color:#999;font-size:12px;margin-bottom:12px}.layout{display:flex;gap:14px;max-width:1400px;margin:0 auto;align-items:flex-start}.sidebar{width:124px;flex-shrink:0}.sidebar-label{font-size:11px;font-weight:bold;color:#7a9ab8;background:white;border-radius:10px;padding:6px 8px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:8px}.cnt{font-size:10px;color:#aac;font-weight:normal;display:block;margin-top:2px}.pool-cards{display:flex;flex-direction:column;gap:8px}.pool-card{background:white;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.1);overflow:hidden;flex-shrink:0}.pcp{width:100%;height:100px;display:flex;align-items:center;justify-content:center;font-size:32px;overflow:hidden}.pcp img{width:100%;height:100%;object-fit:cover;display:block}.pci{padding:5px 7px 7px}.pcn{font-size:11px;font-weight:bold;color:#2c3e50;word-break:break-all;line-height:1.3}.pcr{font-size:10px;color:#7a9ab8;margin-top:2px}.pool-empty{color:#bbb;font-size:11px;text-align:center;padding:16px 4px;line-height:1.8}.main{flex:1;min-width:0}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.pc{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden}.ph{padding:8px 12px;background:white;border-bottom:2px solid #e8f0f8;display:flex;align-items:center;justify-content:space-between}.pn{color:#5b8fd4;font-weight:bold;font-size:13px}.pct{background:#eef4fc;color:#5b8fd4;font-size:10px;font-weight:bold;border-radius:8px;padding:2px 7px}.pb{padding:8px}.slots{display:flex;flex-direction:column;gap:5px}.slot{display:flex;align-items:center;gap:6px;border-radius:8px;padding:5px 7px;min-height:36px}.slot.f{background:linear-gradient(90deg,#f5f9ff,#eef4fc);border:1px solid #dce8f8}.slot.e{background:none;border:2px dashed #ccd8e8}.sn{width:14px;font-size:9px;color:#aac;font-weight:bold;flex-shrink:0;text-align:center}.sp{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden}.sp img{width:100%;height:100%;object-fit:cover}.si{flex:1;min-width:0}.sm{font-size:11px;font-weight:bold;color:#2c3e50;word-break:break-all;line-height:1.2}.sr{font-size:10px;margin-top:1px}.el{flex:1;font-size:10px;color:#ccd8e8;text-align:center}table.t{width:100%;border-collapse:separate;border-spacing:0;background:white;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.08);overflow:hidden}table.t th{background:linear-gradient(135deg,#5b8fd4,#3a6ab0);color:white;font-size:12px;font-weight:bold;padding:10px 12px;text-align:center;white-space:nowrap}table.t td{padding:8px 10px;font-size:12px;text-align:center;border-bottom:1px solid #eef2f8;color:#2c3e50;vertical-align:middle}table.t tr:last-child td{border-bottom:none}table.t tr:hover td{background:#f5f9ff}.tm{display:inline-flex;align-items:center;gap:5px;font-weight:bold}.tp{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;overflow:hidden;flex-shrink:0}.tp img{width:100%;height:100%;object-fit:cover}.te{color:#ccc;font-size:11px}.sp-row td{color:#7a6ab0}.sp-row{background:#f4f0fc}.sub-cards{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0}.sub-mini{display:inline-flex;align-items:center;gap:4px;background:white;border-radius:8px;padding:3px 7px;font-size:11px;box-shadow:0 1px 4px rgba(0,0,0,.08)}.sub-port{width:20px;height:20px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px}.sub-port img{width:100%;height:100%;object-fit:cover}</style></head><body><h1>\u2694\ufe0f \uae38\ub4dc \ud30c\ud2f0 \ud604\ud669</h1><p class="sub">\ud3b8\uc9d1 \ubd88\uac00 \u00b7 \uacf5\uc720\uc6a9</p><div class="tabs"><div class="tab active" id="v-board" onclick="sv('board')">\ud83d\udcca \ubcf4\ub4dc</div><div class="tab" id="v-table" onclick="sv('table')">\ud83d\udccb \ud45c</div></div><div class="info" id="vi"></div><div id="vb"><div class="layout"><div class="sidebar"><div class="sidebar-label">\uc11c\ube0c\ud30c\ud2f0<span class="cnt" id="vcnt"></span></div><div class="pool-cards" id="vpool"></div></div><div class="main"><div class="grid" id="vgrid"></div></div></div></div><div id="vt" style="display:none"><div style="max-width:1100px;margin:0 auto;overflow-x:auto"><table class="t" id="vtbl"></table></div></div><script>const SC=5;const RC={'\ube44\ube44':'#e67e22','\uc5b4\uc2a4':'#3498db','\ud30c\uc774\ud130':'#e74c3c','\ub9c8\ubc95\uc0ac':'#9b59b6','\ud799\uc0ac':'#27ae60','\uc2dc\ud504':'#1abc9c','\uc2a4\ub098\uc774\ud37c':'#7f8c8d','\uc544\uccb4':'#f39c12','\ud30c\ub77c\ub518':'#2980b9','\uc0ac\ub094':'#c0392b','\ucf54\uc5b4\ub77c\ub354':'#16a085','\ubca4\uc6cc':'#8e44ad'};function gc(r){if(!r)return'#5b8fd4';for(const[k,v]of Object.entries(RC))if(r.includes(k))return v;return'#5b8fd4';}function sv(t){document.getElementById('v-board').classList.toggle('active',t==='board');document.getElementById('v-table').classList.toggle('active',t==='table');document.getElementById('vb').style.display=t==='board'?'':'none';document.getElementById('vt').style.display=t==='table'?'':'none';}function gs(pid){const sl=Array(SC).fill(null);members.filter(m=>m.partyId===pid).forEach(m=>{if(m.slotIndex!=null&&m.slotIndex<SC)sl[m.slotIndex]=m;});return sl;}const d=JSON.parse(decodeURIComponent(escape(atob('${enc}'))));const members=d.members,parties=d.parties;const sp=members.filter(m=>!m.partyId),a=members.length-sp.length;document.getElementById('vi').textContent='\uc804\uccb4 '+members.length+'\uba85 \u00b7 \ubc30\uc815\ub428 '+a+'\uba85 \u00b7 \uc11c\ube0c\ud30c\ud2f0 '+sp.length+'\uba85';document.getElementById('vcnt').textContent=sp.length+'\uba85';const pl=document.getElementById('vpool');if(!sp.length)pl.innerHTML='<div style="color:#bbb;font-size:11px;text-align:center;padding:16px 4px;line-height:1.8">\ud83c\udf89<br>\ubaa8\ub450<br>\ubc30\uc815\ub428!</div>';else sp.forEach(m=>{const rc=gc(m.role);const card=document.createElement('div');card.className='pool-card';const pd=document.createElement('div');pd.className='pcp';pd.style.background=m.portrait?'#000':'linear-gradient(135deg,'+rc+'44,'+rc+'22)';pd.innerHTML=m.portrait?'<img src="'+m.portrait+'">':'<span style="font-size:32px">\ud83d\udc64</span>';const info=document.createElement('div');info.className='pci';const cb=document.createElement('div');cb.style.cssText='height:3px;background:'+rc+';margin-bottom:4px';const ne=document.createElement('div');ne.className='pcn';ne.textContent=m.name;const re=document.createElement('div');re.className='pcr';re.textContent=m.role||'\uc5ed\ud560 \ubbf8\uc9c0\uc815';info.append(cb,ne,re);card.append(pd,info);pl.appendChild(card);});const pg=document.getElementById('vgrid');parties.forEach(p=>{const sl=gs(p.id);const f=sl.filter(s=>s).length;const card=document.createElement('div');card.className='pc';card.innerHTML='<div class="ph"><div class="pn">'+p.name+'</div><div class="pct">'+f+'/'+SC+'</div></div><div class="pb"><div class="slots" id="vs'+p.id+'"></div></div>';pg.appendChild(card);const se=document.getElementById('vs'+p.id);sl.forEach((m,i)=>{const s=document.createElement('div');if(m){const rc=gc(m.role);s.className='slot f';const sp2=document.createElement('div');sp2.className='sp';sp2.style.background=m.portrait?'#000':rc+'33';sp2.innerHTML=m.portrait?'<img src="'+m.portrait+'">':'\ud83d\udc64';const si2=document.createElement('div');si2.className='si';const sm=document.createElement('div');sm.className='sm';sm.textContent=m.name;const sr=document.createElement('div');sr.className='sr';sr.style.color=rc;sr.textContent=m.role||'';si2.append(sm,sr);s.innerHTML='<div class="sn" style="color:'+rc+'">'+(i+1)+'</div>';s.append(sp2,si2);}else{s.className='slot e';s.innerHTML='<div class="sn">'+(i+1)+'</div><div class="el">\ube48 \uc790\ub9ac</div>';}se.appendChild(s);});});const tbl=document.getElementById('vtbl');let h='<thead><tr><th>\ud30c\ud2f0</th>';for(let i=1;i<=SC;i++)h+='<th>'+i+'\ubc88</th>';h+='</tr></thead>';tbl.innerHTML=h;const tb=document.createElement('tbody');tbl.appendChild(tb);parties.forEach(p=>{const sl=gs(p.id);const tr=document.createElement('tr');tr.innerHTML='<td><strong>'+p.name+'</strong></td>';sl.forEach(m=>{const td=document.createElement('td');if(m){const rc=gc(m.role);const img=m.portrait?'<img src="'+m.portrait+'">':'\ud83d\udc64';td.innerHTML='<div class="tm"><div class="tp" style="background:'+rc+'33">'+img+'</div><div><div style="font-size:11px;font-weight:bold">'+m.name+'</div><div style="font-size:9px;color:'+rc+'">'+( m.role||'')+'</div></div></div>';}else td.innerHTML='<span class="te">-</span>';tr.appendChild(td);});tb.appendChild(tr);});const spList=members.filter(m=>!m.partyId);if(spList.length){const tr=document.createElement('tr');tr.className='sp-row';tr.innerHTML='<td><strong>\uc11c\ube0c\ud30c\ud2f0</strong></td>';const td=document.createElement('td');td.colSpan=SC;const wrap=document.createElement('div');wrap.className='sub-cards';spList.forEach(m=>{const rc=gc(m.role);const item=document.createElement('div');item.className='sub-mini';const port=document.createElement('div');port.className='sub-port';port.style.background=m.portrait?'#000':rc+'33';port.innerHTML=m.portrait?'<img src="'+m.portrait+'">':'\ud83d\udc64';const label=document.createElement('span');label.textContent=m.name+(m.role?' ('+m.role+')':'');label.style.color='#5a3a9a';item.append(port,label);wrap.appendChild(item);});td.appendChild(wrap);tr.appendChild(td);tb.appendChild(tr);}<\/script></body></html>`;
+}
+
+function renameParty(pid){
+  const p=parties.find(x=>x.id===pid);
+  const name=prompt('파티 이름:',p.name);
+  if(!name||!name.trim()) return;p.name=name.trim();save();render();
+}
+function resetAll(){
+  if(!confirm('모든 파티 배정을 초기화할까요?')) return;
+  members.forEach(m=>{m.partyId=null;m.slotIndex=null;});save();render();
+}
+function openAddModal(){
+  document.getElementById('inputName').value='';
+  document.getElementById('inputRole').value='';
+  document.getElementById('editModal').classList.add('show');
+  setTimeout(()=>document.getElementById('inputName').focus(),100);
+}
+function saveAdd(){
+  const name=document.getElementById('inputName').value.trim();if(!name) return;
+  const role=document.getElementById('inputRole').value.trim();
+  members.push({id:uid(),name,role,portrait:null,partyId:null,slotIndex:null});save();render();closeModal('editModal');
+}
+function openPasteModal(){
+  document.getElementById('pasteText').value='';
+  document.getElementById('pasteModal').classList.add('show');
+  setTimeout(()=>document.getElementById('pasteText').focus(),100);
+}
+function savePaste(){
+  document.getElementById('pasteText').value.split('\n').map(l=>l.trim()).filter(l=>l)
+    .forEach(name=>members.push({id:uid(),name,role:'',portrait:null,partyId:null,slotIndex:null}));
+  save();render();closeModal('pasteModal');
+}
+function delMember(mid){
+  const m=members.find(x=>x.id===mid);if(!confirm(`'${m.name}'을(를) 삭제할까요?`)) return;
+  members.splice(members.indexOf(m),1);save();render();
+}
+function openEditMember(mid){
+  editId=mid;
+  const m=members.find(x=>x.id===mid);
+  document.getElementById('inputEditName').value=m.name;
+  document.getElementById('inputEditRole').value=m.role||'';
+  document.getElementById('editMemberModal').classList.add('show');
+  setTimeout(()=>document.getElementById('inputEditName').focus(),100);
+}
+function saveEditMember(){
+  const name=document.getElementById('inputEditName').value.trim();if(!name) return;
+  const role=document.getElementById('inputEditRole').value.trim();
+  const m=members.find(x=>x.id===editId);m.name=name;m.role=role;
+  save();render();closeModal('editMemberModal');
+}
+function openPickModal(partyId,slotIndex){
+  const sub=members.filter(m=>!m.partyId);
+  if(!sub.length){alert('서브파티에 멤버가 없어요!');return;}
+  pickPartyId=partyId;pickSlot=slotIndex;
+  document.getElementById('pickModalTitle').textContent=`${parties.find(p=>p.id===partyId).name} · ${slotIndex+1}번 자리`;
+  const list=document.getElementById('pickList');list.innerHTML='';
+  sub.forEach(m=>{
+    const item=document.createElement('div');item.className='pick-item';
+    const rc=getRoleColor(m.role);
+    const port=document.createElement('div');port.className='pick-port';
+    port.style.background=m.portrait?'#000':rc+'33';
+    if(m.portrait) port.innerHTML=`<img src="${m.portrait}">`; else port.textContent='👤';
+    const info=document.createElement('div');info.className='pick-info';
+    const nm=document.createElement('div');nm.className='pick-name';nm.textContent=m.name;
+    const rl=document.createElement('div');rl.className='pick-role';rl.style.color=rc;rl.textContent=m.role||'역할 미지정';
+    info.append(nm,rl);item.append(port,info);
+    item.onclick=()=>{m.partyId=pickPartyId;m.slotIndex=pickSlot;save();render();closeModal('pickModal');};
+    list.appendChild(item);
+  });
+  document.getElementById('pickModal').classList.add('show');
+}
+function triggerUpload(mid){uploadId=mid;document.getElementById('fileInput').click();}
+function handleImageUpload(e){
+  const file=e.target.files[0];if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{members.find(x=>x.id===uploadId).portrait=ev.target.result;save();render();};
+  reader.readAsDataURL(file);e.target.value='';
+}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+document.querySelectorAll('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('show');}));
+document.getElementById('inputName').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('inputRole').focus();});
+document.getElementById('inputRole').addEventListener('keydown',e=>{if(e.key==='Enter')saveAdd();});
+document.getElementById('inputEditName').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('inputEditRole').focus();});
+document.getElementById('inputEditRole').addEventListener('keydown',e=>{if(e.key==='Enter')saveEditMember();});
+load();render();
+</script>
+</body>
+</html>
